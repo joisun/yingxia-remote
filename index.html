@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111419" />
+  <title>映匣遥控器</title>
+  <style>
+    :root { color-scheme: dark; font-family: "SF Pro Display", "PingFang SC", "Avenir Next", sans-serif; color: #f4f5f5; background: #111419; }
+    * { box-sizing: border-box; }
+    html { height: 100%; overflow: hidden; overscroll-behavior: none; }
+    body { position: fixed; inset: 0; margin: 0; height: 100dvh; overflow: hidden; padding: max(18px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom)); display: grid; place-items: center; background: radial-gradient(ellipse 80% 45% at 50% 8%, #303740 0%, transparent 65%), #111419; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    button { color: inherit; font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    button:focus-visible { outline: 2px solid #d5e9ff; outline-offset: 3px; }
+    .icon { width: 23px; height: 23px; display: block; filter: invert(1); opacity: .93; pointer-events: none; }
+    .shell { width: min(100%, 380px); }
+    .topline { display: flex; align-items: center; justify-content: space-between; margin: 0 6px 18px; }
+    .brand { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 700; letter-spacing: .03em; }
+    .brand .icon { width: 19px; height: 19px; }
+    .connection { display: flex; align-items: center; gap: 7px; color: #a9b0b3; font-size: 11px; letter-spacing: .08em; }
+    .connection::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #7acba9; box-shadow: 0 0 9px #7acba960; }
+    .connection[data-state="error"]::before { background: #ed8585; box-shadow: 0 0 9px #ed858560; }
+    .mode-picker { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; margin-bottom: 16px; gap: 4px; background: #20252a; border: 1px solid #454c50; border-radius: 16px; }
+    .mode-picker button { border: 0; border-radius: 12px; height: 42px; display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; color: #aeb6b8; font-size: 13px; font-weight: 650; }
+    .mode-picker button .icon { width: 16px; height: 16px; opacity: .55; }
+    .mode-picker button[aria-pressed="true"] { background: linear-gradient(#50575a, #3b4245); color: white; box-shadow: inset 0 1px #ffffff3a, 0 2px 7px #0005; }
+    .mode-picker button[aria-pressed="true"] .icon { opacity: 1; }
+    .mode-picker button.is-pressed { transform: translateY(1px); background: #46545b; }
+    .remote { padding: 20px 21px 24px; border: 1px solid #eff3f4; border-radius: 40px; background: linear-gradient(110deg, #aeb7bc 0%, #e1e5e7 23%, #c6cdd1 52%, #eef0f1 76%, #9ba5aa 100%); box-shadow: inset 0 2px #fff9, inset -3px 0 8px #5b656b55, 0 23px 50px #0009; }
+    .touchpad { position: relative; width: min(100%, max(148px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 470px))); aspect-ratio: 1; margin: 0 auto; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 48% 32%, #353b3f, #24292d 65%, #111518 100%); border: 2px solid #78848a; box-shadow: inset 0 5px 13px #000b, inset 0 -2px #ffffff18, 0 2px 5px #647076; touch-action: none; }
+    .touchpad::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; border: 1px solid #ffffff09; pointer-events: none; }
+    .direction { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; opacity: .75; z-index: 1; }
+    .direction .icon { position: absolute; width: 20px; height: 20px; }
+    .direction[data-command="up"] { clip-path: polygon(50% 50%, 0 0, 100% 0); }
+    .direction[data-command="down"] { clip-path: polygon(50% 50%, 100% 100%, 0 100%); }
+    .direction[data-command="left"] { clip-path: polygon(50% 50%, 0 100%, 0 0); }
+    .direction[data-command="right"] { clip-path: polygon(50% 50%, 100% 0, 100% 100%); }
+    .direction[data-command="up"] .icon { left: calc(50% - 10px); top: 12%; }
+    .direction[data-command="down"] .icon { left: calc(50% - 10px); bottom: 12%; }
+    .direction[data-command="left"] .icon { top: calc(50% - 10px); left: 12%; }
+    .direction[data-command="right"] .icon { top: calc(50% - 10px); right: 12%; }
+    .direction.is-pressed { background: radial-gradient(circle at center, #3d535e55 15%, #64809299 100%); opacity: 1; }
+    .select { position: absolute; z-index: 2; inset: 32%; border-radius: 50%; border: 1px solid #869196; background: linear-gradient(150deg, #50595e, #2c3337 68%, #20262a); box-shadow: inset 0 1px #ffffff63, 0 6px 16px #0009; font-size: 15px; font-weight: 750; letter-spacing: .14em; }
+    .select.is-pressed { transform: scale(.97); background: #46565e; box-shadow: inset 0 4px 12px #000b, 0 2px 4px #0005; }
+    .key-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; min-height: 147px; margin-top: 25px; align-content: start; }
+    .key { min-height: 68px; padding: 9px 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; border-radius: 19px; border: 1px solid #5b6468; background: linear-gradient(#31383c, #171c20); box-shadow: inset 0 1px #ffffff42, 0 3px 7px #4b545888; font-size: 11px; font-weight: 650; }
+    .key .icon { width: 21px; height: 21px; }
+    .key.is-pressed { transform: translateY(2px) scale(.98); box-shadow: inset 0 3px 9px #000b, 0 1px 2px #0005; background: #46565e; }
+    .key[data-command="context"] { background: linear-gradient(#3b474d, #20282d); }
+    .volume-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin-top: 16px; color: #30393e; font-size: 12px; font-weight: 750; text-align: center; }
+    .volume-row button { min-height: 48px; display: grid; place-items: center; border: 1px solid #677176; border-radius: 14px; background: linear-gradient(#353e42, #1d2428); box-shadow: inset 0 1px #ffffff3d, 0 3px 6px #58626877; }
+    .volume-row button.is-pressed { transform: translateY(2px); background: #46565e; box-shadow: inset 0 3px 9px #000b; }
+    .volume-row .icon { width: 20px; height: 20px; margin: auto; }
+    .player-only { display: none; }
+    body[data-mode="player"] .key-grid { grid-template-columns: repeat(2, 1fr); }
+    body[data-mode="player"] .player-only { display: flex; }
+    body[data-mode="player"] .browse-only { display: none; }
+    .status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .status[data-kind="error"] { position: fixed; z-index: 4; inset: auto 18px max(20px, env(safe-area-inset-bottom)) 18px; width: auto; height: auto; max-width: 380px; margin: 0 auto; padding: 12px 16px; overflow: visible; clip-path: none; white-space: normal; text-align: center; border: 1px solid #b76a6a; border-radius: 14px; color: #ffe1e1; background: #42282ddd; box-shadow: 0 8px 24px #0008; font-size: 12px; line-height: 1.4; }
+    .tip { margin: 12px 8px 0; text-align: center; color: #798387; font-size: 11px; line-height: 1.5; }
+    .player-tip { display: none; }
+    body[data-mode="player"] .browse-tip { display: none; }
+    body[data-mode="player"] .player-tip { display: block; }
+    @media (max-height: 760px) {
+      .topline { margin-bottom: 8px; }
+      .mode-picker { margin-bottom: 8px; }
+      .mode-picker button { height: 36px; }
+      .remote { padding: 12px 16px 14px; border-radius: 30px; }
+      .touchpad { width: min(100%, max(148px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 420px))); }
+      .key-grid { gap: 8px; min-height: 124px; margin-top: 12px; }
+      .key { min-height: 50px; gap: 4px; border-radius: 14px; }
+      .key .icon { width: 18px; height: 18px; }
+      .volume-row { margin-top: 10px; }
+      .volume-row button { min-height: 42px; }
+      .tip { margin-top: 7px; }
+    }
+    @media (max-height: 700px) { .tip { display: none !important; } }
+    @media (max-height: 520px) and (max-width: 599px) {
+      .topline { display: none; }
+      .mode-picker button { height: 32px; }
+      .remote { padding: 8px 12px 10px; }
+      .key-grid { min-height: 124px; margin-top: 8px; }
+      .key { min-height: 44px; }
+      .volume-row { margin-top: 7px; }
+      .volume-row button { min-height: 38px; }
+    }
+    @media (max-height: 500px) and (min-width: 600px) {
+      .shell { width: min(100%, 780px); display: grid; grid-template-columns: minmax(200px, 1fr) minmax(300px, 1fr); grid-template-rows: auto auto auto; align-items: center; column-gap: 18px; }
+      .topline { grid-column: 1; grid-row: 1; }
+      .mode-picker { grid-column: 1; grid-row: 2; }
+      .remote { grid-column: 2; grid-row: 1 / span 2; padding: 8px 12px 10px; }
+      .touchpad { width: min(100%, 150px); }
+      .key-grid { min-height: 122px; margin-top: 8px; gap: 6px; }
+      .key { min-height: 42px; }
+      .volume-row { margin-top: 8px; }
+      .volume-row button { min-height: 38px; }
+    }
+    @media (prefers-reduced-motion: no-preference) { button { transition: transform .1s ease, box-shadow .1s ease, opacity .1s ease; } }
+  </style>
+</head>
+<body data-mode="browse">
+  <main class="shell">
+    <div class="topline">
+      <div class="brand"><img class="icon" src="/icons/tv-minimal-play.svg" alt="" />映匣遥控器</div>
+      <div class="connection" id="connection" data-state="ok">同一 Wi-Fi</div>
+    </div>
+    <div class="mode-picker" aria-label="控制窗口">
+      <button type="button" data-mode-choice="browse" aria-pressed="true"><img class="icon" src="/icons/house.svg" alt="" />主界面</button>
+      <button type="button" data-mode-choice="player" aria-pressed="false"><img class="icon" src="/icons/tv-minimal-play.svg" alt="" />播放窗口</button>
+    </div>
+    <section class="remote" aria-label="遥控器">
+      <div class="touchpad" id="touchpad" aria-label="方向触控区">
+        <button type="button" class="direction" data-command="up" aria-label="上"><img class="icon" src="/icons/chevron-up.svg" alt="" /></button>
+        <button type="button" class="direction" data-command="right" aria-label="右"><img class="icon" src="/icons/chevron-right.svg" alt="" /></button>
+        <button type="button" class="direction" data-command="down" aria-label="下"><img class="icon" src="/icons/chevron-down.svg" alt="" /></button>
+        <button type="button" class="direction" data-command="left" aria-label="左"><img class="icon" src="/icons/chevron-left.svg" alt="" /></button>
+        <button type="button" class="select" data-command="select">确认</button>
+      </div>
+      <div class="key-grid">
+        <button type="button" class="key" data-command="back"><img class="icon" src="/icons/arrow-left.svg" alt="" /><span>返回</span></button>
+        <button type="button" class="key browse-only" data-command="context"><img class="icon" src="/icons/ellipsis.svg" alt="" /><span>更多操作</span></button>
+        <button type="button" class="key player-only" data-command="play"><img class="icon" src="/icons/play.svg" alt="" /><span>播放 / 暂停</span></button>
+        <button type="button" class="key browse-only" data-command="activate"><img class="icon" src="/icons/house.svg" alt="" /><span>主窗口</span></button>
+        <button type="button" class="key player-only" data-command="fullscreen"><img class="icon" src="/icons/maximize.svg" alt="" /><span>全屏</span></button>
+        <button type="button" class="key player-only" data-command="mute"><img class="icon" src="/icons/volume-x.svg" alt="" /><span>静音</span></button>
+      </div>
+      <div class="volume-row" aria-label="Mac 音量">
+        <button type="button" data-command="volume_down" aria-label="降低 Mac 音量"><img class="icon" src="/icons/volume-1.svg" alt="" /></button>
+        <span>Mac 音量</span>
+        <button type="button" data-command="volume_up" aria-label="提高 Mac 音量"><img class="icon" src="/icons/volume-2.svg" alt="" /></button>
+      </div>
+    </section>
+    <p class="status" id="status" role="status" aria-live="polite">轻触方向键选择内容</p>
+    <p class="tip browse-tip">按住方向键连续移动 · 长按确认发送右键</p>
+    <p class="tip player-tip">左右跳转 · 上下调播放器音量 · 长按音量键连续调节</p>
+  </main>
+  <script>
+    const status = document.querySelector('#status');
+    const connection = document.querySelector('#connection');
+    let busy = false;
+    let repeatTimer;
+    let repeatInterval;
+    let longPressTimer;
+    let longPressed = false;
+
+    function feedback(message, kind = 'ok') {
+      status.textContent = message;
+      status.dataset.kind = kind;
+      connection.dataset.state = kind === 'error' ? 'error' : 'ok';
+    }
+
+    async function send(command, mode = document.body.dataset.mode) {
+      if (busy) return false;
+      busy = true;
+      try {
+        const response = await fetch('/command', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode, command }),
+        });
+        const message = await response.text();
+        if (!response.ok) throw new Error(message);
+        feedback(command === 'activate' || command.startsWith('volume_') || mode === 'browse' ? message : '已发送：' + commandLabel(command));
+        return true;
+      } catch (error) {
+        feedback(error.message || '连接失败', 'error');
+        return false;
+      } finally { busy = false; }
+    }
+
+    function commandLabel(command) {
+      return ({ up: '上', down: '下', left: '左', right: '右', select: '确认', back: '返回', play: '播放 / 暂停', fullscreen: '全屏', mute: '静音', volume_up: '音量增大', volume_down: '音量减小' })[command] || command;
+    }
+
+    function tactile(button, sustained = false) {
+      navigator.vibrate?.(18);
+      button.classList.add('is-pressed');
+      if (!sustained) window.setTimeout(() => button.classList.remove('is-pressed'), 190);
+    }
+
+    document.querySelectorAll('[data-mode-choice]').forEach(button => {
+      button.addEventListener('pointerdown', () => tactile(button, true));
+      button.addEventListener('pointerup', () => button.classList.remove('is-pressed'));
+      button.addEventListener('pointercancel', () => button.classList.remove('is-pressed'));
+      button.addEventListener('click', async event => {
+        if (event.detail === 0) tactile(button);
+        const mode = button.dataset.modeChoice;
+        if (await send('activate', mode)) {
+          document.body.dataset.mode = mode;
+          document.querySelectorAll('[data-mode-choice]').forEach(choice => choice.setAttribute('aria-pressed', String(choice === button)));
+        }
+      });
+    });
+
+    document.querySelectorAll('.key').forEach(button => {
+      button.addEventListener('pointerdown', () => tactile(button, true));
+      button.addEventListener('pointerup', () => button.classList.remove('is-pressed'));
+      button.addEventListener('pointercancel', () => button.classList.remove('is-pressed'));
+      button.addEventListener('click', event => { if (event.detail === 0) tactile(button); send(button.dataset.command); });
+    });
+    document.querySelectorAll('.volume-row button').forEach(button => {
+      let timer;
+      let interval;
+      const stop = () => { clearTimeout(timer); clearInterval(interval); button.classList.remove('is-pressed'); };
+      button.addEventListener('pointerdown', event => {
+        button.setPointerCapture(event.pointerId);
+        tactile(button, true);
+        send(button.dataset.command);
+        timer = setTimeout(() => { interval = setInterval(() => send(button.dataset.command), 170); }, 450);
+      });
+      button.addEventListener('pointerup', stop);
+      button.addEventListener('pointercancel', stop);
+      button.addEventListener('click', event => { if (event.detail === 0) send(button.dataset.command); });
+    });
+
+    document.querySelectorAll('.direction').forEach(button => {
+      button.addEventListener('click', event => { if (event.detail === 0) send(button.dataset.command); });
+    });
+
+    const touchpad = document.querySelector('#touchpad');
+    let ringPress;
+    touchpad.addEventListener('pointerdown', event => {
+      const button = event.target.closest('.direction');
+      if (!button) return;
+      event.preventDefault();
+      touchpad.setPointerCapture(event.pointerId);
+      ringPress = { button, x: event.clientX, y: event.clientY };
+      tactile(button, true);
+      send(button.dataset.command);
+      repeatTimer = setTimeout(() => {
+        repeatInterval = setInterval(() => send(button.dataset.command), 140);
+      }, 430);
+    });
+    function stopRing(event) {
+      if (!ringPress) return;
+      clearTimeout(repeatTimer); clearInterval(repeatInterval);
+      ringPress.button.classList.remove('is-pressed');
+      const dx = event.clientX - ringPress.x;
+      const dy = event.clientY - ringPress.y;
+      const firstDirection = ringPress.button.dataset.command;
+      ringPress = null;
+      if (event.type === 'pointercancel' || Math.max(Math.abs(dx), Math.abs(dy)) < 35) return;
+      const swipeDirection = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      if (swipeDirection !== firstDirection) send(swipeDirection);
+    }
+    touchpad.addEventListener('pointerup', stopRing);
+    touchpad.addEventListener('pointercancel', stopRing);
+
+    const select = document.querySelector('.select');
+    select.addEventListener('pointerdown', event => {
+      select.setPointerCapture(event.pointerId);
+      tactile(select, true);
+      longPressed = false;
+      longPressTimer = setTimeout(() => {
+        if (document.body.dataset.mode === 'browse') { longPressed = true; send('context'); }
+      }, 550);
+    });
+    select.addEventListener('pointerup', () => { clearTimeout(longPressTimer); select.classList.remove('is-pressed'); if (!longPressed) send('select'); });
+    select.addEventListener('pointercancel', () => { clearTimeout(longPressTimer); select.classList.remove('is-pressed'); });
+    select.addEventListener('click', event => { if (event.detail === 0) send('select'); });
+
+    document.addEventListener('contextmenu', event => event.preventDefault());
+    document.addEventListener('selectstart', event => event.preventDefault());
+
+    document.addEventListener('keydown', event => {
+      const command = ({ ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'select', Escape: 'back' })[event.key];
+      if (command) { event.preventDefault(); send(command); }
+    });
+
+    fetch('/status').then(async response => {
+      if (!response.ok) feedback(await response.text(), 'error');
+    }).catch(() => feedback('连接不到 Mac，请检查 Wi-Fi', 'error'));
+  </script>
+</body>
+</html>

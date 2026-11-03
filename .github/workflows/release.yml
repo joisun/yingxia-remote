@@ -1,0 +1,98 @@
+name: Release macOS app
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine release channel
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "APP_VERSION=${version%%-*}" >> "$GITHUB_ENV"
+          if [[ "$version" == *-preview* ]]; then
+            echo "PREVIEW=true" >> "$GITHUB_ENV"
+          else
+            echo "PREVIEW=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Check signing credentials
+        if: env.PREVIEW != 'true'
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in CERTIFICATE_P12_BASE64 CERTIFICATE_PASSWORD CODESIGN_IDENTITY APPLE_ID APPLE_APP_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing repository secret: $name" >&2
+              exit 1
+            fi
+          done
+
+      - name: Import Developer ID certificate
+        if: env.PREVIEW != 'true'
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/yingxia-release.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERTIFICATE_P12_BASE64" | base64 -D > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$KEYCHAIN_PATH" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+      - name: Build universal app
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
+          APP_BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          if [[ "$PREVIEW" == "true" ]]; then unset CODESIGN_IDENTITY; fi
+          ./build-app.sh
+          codesign --verify --deep --strict --verbose=2 dist/YingxiaRemote.app
+
+      - name: Notarize and staple
+        if: env.PREVIEW != 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent dist/YingxiaRemote.app "$RUNNER_TEMP/yingxia-notary.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/yingxia-notary.zip" \
+            --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple dist/YingxiaRemote.app
+          xcrun stapler validate dist/YingxiaRemote.app
+
+      - name: Package release asset
+        run: |
+          archive="dist/YingxiaRemote-${GITHUB_REF_NAME}-macOS-universal.zip"
+          ditto -c -k --keepParent dist/YingxiaRemote.app "$archive"
+          (cd dist && shasum -a 256 "$(basename "$archive")" > SHA256SUMS)
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          assets=("dist/YingxiaRemote-${GITHUB_REF_NAME}-macOS-universal.zip" dist/SHA256SUMS)
+          if [[ "$PREVIEW" == "true" ]]; then
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --verify-tag --prerelease \
+              --notes "预览版：使用本地签名，尚未经过 Apple 公证。首次打开时 macOS 可能要求在系统设置中批准。"
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --verify-tag --generate-notes
+          fi

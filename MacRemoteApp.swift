@@ -311,6 +311,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var addressItem: NSMenuItem?
     private var address: String?
+    private var connectionWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -324,6 +325,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let addressItem = NSMenuItem(title: "正在启动…", action: nil, keyEquivalent: "")
         addressItem.isEnabled = false
         menu.addItem(addressItem)
+        menu.addItem(NSMenuItem(title: "显示连接窗口", action: #selector(showConnectionWindow), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "复制手机地址", action: #selector(copyAddress), keyEquivalent: "c"))
         menu.addItem(NSMenuItem(title: "在浏览器中打开", action: #selector(openAddress), keyEquivalent: "o"))
         menu.addItem(NSMenuItem(title: "打开辅助功能设置", action: #selector(openAccessibilitySettings), keyEquivalent: ""))
@@ -335,7 +337,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         self.addressItem = addressItem
         let prompt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(prompt)
-        guard let ip = wifiAddress() else { addressItem.title = "未找到 Wi-Fi 地址"; return }
+        guard let ip = wifiAddress() else {
+            addressItem.title = "未找到 Wi-Fi 地址"
+            showConnectionWindow()
+            return
+        }
         do {
             let server = try RemoteServer(address: ip)
             try server.start()
@@ -343,6 +349,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             address = "http://\(ip):\(port)/"
             addressItem.title = address!
         } catch { addressItem.title = error.localizedDescription }
+        showConnectionWindow()
     }
 
     func applicationWillTerminate(_ notification: Notification) { server?.stop() }
@@ -361,6 +368,52 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openAccessibilitySettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
+    }
+
+    @objc private func showConnectionWindow() {
+        if let connectionWindow {
+            connectionWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 230),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "映匣遥控器"
+        window.isReleasedWhenClosed = false
+        let content = NSView()
+        window.contentView = content
+
+        let title = NSTextField(labelWithString: "用手机控制 Mac 上的映匣")
+        title.font = .boldSystemFont(ofSize: 18)
+        let instruction = NSTextField(wrappingLabelWithString: "手机与 Mac 连接同一 Wi-Fi，然后打开下面的地址。关闭此窗口后，遥控器仍在菜单栏运行。")
+        instruction.textColor = .secondaryLabelColor
+        let addressLabel = NSTextField(labelWithString: address ?? addressItem?.title ?? "正在启动…")
+        addressLabel.font = .monospacedSystemFont(ofSize: 15, weight: .medium)
+        addressLabel.isSelectable = true
+        let permission = NSTextField(wrappingLabelWithString: AXIsProcessTrusted()
+            ? "辅助功能已允许"
+            : "首次使用请在系统设置中允许“映匣遥控器”访问辅助功能，然后重新打开应用。")
+        permission.textColor = .secondaryLabelColor
+
+        let copyButton = NSButton(title: "复制手机地址", target: self, action: #selector(copyAddress))
+        let settingsButton = NSButton(title: "打开辅助功能设置", target: self, action: #selector(openAccessibilitySettings))
+        let buttons = NSStackView(views: [copyButton, settingsButton])
+        buttons.spacing = 12
+        let stack = NSStackView(views: [title, instruction, addressLabel, permission, buttons])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
+            stack.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+        ])
+        window.center()
+        connectionWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func quit() { NSApp.terminate(nil) }

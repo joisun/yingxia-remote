@@ -5,7 +5,7 @@
 ## 使用
 
 1. 在 Mac 上安装并打开映匣，打开映匣主窗口。
-2. 下载 GitHub Releases 中适合的 `YingxiaRemote-*-macOS-universal.zip`，解压并把 `YingxiaRemote.app` 放入“应用程序”。应用在菜单栏运行，不会打开 Mac 窗口。
+2. 下载 GitHub Releases 中适合的 `YingxiaRemote-*-macOS-universal.zip`，解压并把 `YingxiaRemote.app` 放入“应用程序”。启动后会显示手机连接窗口；关闭窗口后，应用仍在菜单栏运行，可从菜单栏再次打开。
 3. 首次启动时，在“系统设置 → 隐私与安全性 → 辅助功能”允许“映匣遥控器”，然后退出并重新打开应用。播放快捷键还可能触发 macOS 的“自动化”授权提示。
 4. 点击菜单栏的电视图标，选择“复制手机地址”；让手机与 Mac 连接同一 Wi-Fi，在手机浏览器打开该地址，例如 `http://192.168.1.2:8765/`。地址无需 token，Mac 的 Wi-Fi 地址变化后要从菜单栏重新复制。
 

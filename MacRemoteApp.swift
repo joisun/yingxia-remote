@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import CoreImage
 import Darwin
 import Foundation
 
@@ -376,7 +377,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 230),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: address == nil ? 230 : 470),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "映匣遥控器"
         window.isReleasedWhenClosed = false
@@ -385,8 +386,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let title = NSTextField(labelWithString: "用手机控制 Mac 上的映匣")
         title.font = .boldSystemFont(ofSize: 18)
-        let instruction = NSTextField(wrappingLabelWithString: "手机与 Mac 连接同一 Wi-Fi，然后打开下面的地址。关闭此窗口后，遥控器仍在菜单栏运行。")
+        let instruction = NSTextField(wrappingLabelWithString: "手机与 Mac 连接同一 Wi-Fi，扫码或打开下面的地址。关闭窗口后，遥控器仍在菜单栏运行。")
         instruction.textColor = .secondaryLabelColor
+        instruction.alignment = .center
         let addressLabel = NSTextField(labelWithString: address ?? addressItem?.title ?? "正在启动…")
         addressLabel.font = .monospacedSystemFont(ofSize: 15, weight: .medium)
         addressLabel.isSelectable = true
@@ -394,14 +396,35 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             ? "辅助功能已允许"
             : "首次使用请在系统设置中允许“映匣遥控器”访问辅助功能，然后重新打开应用。")
         permission.textColor = .secondaryLabelColor
+        permission.alignment = .center
 
         let copyButton = NSButton(title: "复制手机地址", target: self, action: #selector(copyAddress))
         let settingsButton = NSButton(title: "打开辅助功能设置", target: self, action: #selector(openAccessibilitySettings))
         let buttons = NSStackView(views: [copyButton, settingsButton])
         buttons.spacing = 12
-        let stack = NSStackView(views: [title, instruction, addressLabel, permission, buttons])
+        var views: [NSView] = [title, instruction]
+        if let address, let qrImage = qrCode(for: address) {
+            let card = NSView()
+            card.wantsLayer = true
+            card.layer?.backgroundColor = NSColor.white.cgColor
+            card.layer?.cornerRadius = 14
+            let code = NSImageView(image: qrImage)
+            code.translatesAutoresizingMaskIntoConstraints = false
+            card.addSubview(code)
+            NSLayoutConstraint.activate([
+                card.widthAnchor.constraint(equalToConstant: 196),
+                card.heightAnchor.constraint(equalToConstant: 196),
+                code.widthAnchor.constraint(equalToConstant: 180),
+                code.heightAnchor.constraint(equalToConstant: 180),
+                code.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+                code.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            ])
+            views.append(card)
+        }
+        views.append(contentsOf: [addressLabel, permission, buttons])
+        let stack = NSStackView(views: views)
         stack.orientation = .vertical
-        stack.alignment = .leading
+        stack.alignment = .centerX
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(stack)
@@ -409,11 +432,23 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
             stack.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            instruction.widthAnchor.constraint(lessThanOrEqualToConstant: 392),
+            permission.widthAnchor.constraint(lessThanOrEqualToConstant: 392),
         ])
         window.center()
         connectionWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func qrCode(for address: String) -> NSImage? {
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(Data(address.utf8), forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        guard let output = filter.outputImage else { return nil }
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 8, y: 8))
+        guard let cgImage = CIContext().createCGImage(scaled, from: scaled.extent) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: 180, height: 180))
     }
 
     @objc private func quit() { NSApp.terminate(nil) }

@@ -315,7 +315,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var connectionWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "tv", accessibilityDescription: "映匣遥控器")
         if item.button?.image == nil { item.button?.title = "遥控" }
@@ -340,7 +340,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = AXIsProcessTrustedWithOptions(prompt)
         guard let ip = wifiAddress() else {
             addressItem.title = "未找到 Wi-Fi 地址"
-            showConnectionWindow()
+            DispatchQueue.main.async { self.showConnectionWindow() }
             return
         }
         do {
@@ -350,10 +350,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             address = "http://\(ip):\(port)/"
             addressItem.title = address!
         } catch { addressItem.title = error.localizedDescription }
-        showConnectionWindow()
+        DispatchQueue.main.async { self.showConnectionWindow() }
     }
 
     func applicationWillTerminate(_ notification: Notification) { server?.stop() }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showConnectionWindow()
+        return true
+    }
 
     @objc private func copyAddress() {
         guard let address else { return }

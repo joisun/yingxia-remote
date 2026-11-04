@@ -17,16 +17,15 @@
     .topline { display: flex; align-items: center; justify-content: space-between; margin: 0 6px 18px; }
     .brand { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 700; letter-spacing: .03em; }
     .brand .icon { width: 19px; height: 19px; }
-    .connection { display: flex; align-items: center; gap: 7px; color: #a9b0b3; font-size: 11px; letter-spacing: .08em; }
-    .connection::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #7acba9; box-shadow: 0 0 9px #7acba960; }
-    .connection[data-state="error"]::before { background: #ed8585; box-shadow: 0 0 9px #ed858560; }
+    .connection { position: absolute; top: 10px; left: 50%; width: 6px; height: 6px; transform: translate(-50%, -50%); border-radius: 50%; background: #7acba9; box-shadow: 0 0 9px #7acba960; pointer-events: none; }
+    .connection[data-state="error"] { background: #ed8585; box-shadow: 0 0 9px #ed858560; }
     .mode-picker { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; margin-bottom: 16px; gap: 4px; background: #20252a; border: 1px solid #454c50; border-radius: 16px; }
     .mode-picker button { border: 0; border-radius: 12px; height: 42px; display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; color: #aeb6b8; font-size: 13px; font-weight: 650; }
     .mode-picker button .icon { width: 16px; height: 16px; opacity: .55; }
     .mode-picker button[aria-pressed="true"] { background: linear-gradient(#50575a, #3b4245); color: white; box-shadow: inset 0 1px #ffffff3a, 0 2px 7px #0005; }
     .mode-picker button[aria-pressed="true"] .icon { opacity: 1; }
     .mode-picker button.is-pressed { transform: translateY(1px); background: #46545b; }
-    .remote { padding: 20px 21px 24px; border: 1px solid #eff3f4; border-radius: 40px; background: linear-gradient(110deg, #aeb7bc 0%, #e1e5e7 23%, #c6cdd1 52%, #eef0f1 76%, #9ba5aa 100%); box-shadow: inset 0 2px #fff9, inset -3px 0 8px #5b656b55, 0 23px 50px #0009; }
+    .remote { position: relative; padding: 20px 21px 24px; border: 1px solid #eff3f4; border-radius: 40px; background: linear-gradient(110deg, #aeb7bc 0%, #e1e5e7 23%, #c6cdd1 52%, #eef0f1 76%, #9ba5aa 100%); box-shadow: inset 0 2px #fff9, inset -3px 0 8px #5b656b55, 0 23px 50px #0009; }
     .touchpad { position: relative; width: min(100%, max(148px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 470px))); aspect-ratio: 1; margin: 0 auto; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 48% 32%, #353b3f, #24292d 65%, #111518 100%); border: 2px solid #78848a; box-shadow: inset 0 5px 13px #000b, inset 0 -2px #ffffff18, 0 2px 5px #647076; touch-action: none; }
     .touchpad::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; border: 1px solid #ffffff09; pointer-events: none; }
     .direction { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; opacity: .75; z-index: 1; }
@@ -66,6 +65,7 @@
       .mode-picker { margin-bottom: 8px; }
       .mode-picker button { height: 36px; }
       .remote { padding: 12px 16px 14px; border-radius: 30px; }
+      .connection { top: 6px; }
       .touchpad { width: min(100%, max(148px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 420px))); }
       .key-grid { gap: 8px; min-height: 124px; margin-top: 12px; }
       .key { min-height: 50px; gap: 4px; border-radius: 14px; }
@@ -79,6 +79,7 @@
       .topline { display: none; }
       .mode-picker button { height: 32px; }
       .remote { padding: 8px 12px 10px; }
+      .connection { top: 4px; }
       .key-grid { min-height: 124px; margin-top: 8px; }
       .key { min-height: 44px; }
       .volume-row { margin-top: 7px; }
@@ -89,6 +90,7 @@
       .topline { grid-column: 1; grid-row: 1; }
       .mode-picker { grid-column: 1; grid-row: 2; }
       .remote { grid-column: 2; grid-row: 1 / span 2; padding: 8px 12px 10px; }
+      .connection { top: 4px; }
       .touchpad { width: min(100%, 150px); }
       .key-grid { min-height: 122px; margin-top: 8px; gap: 6px; }
       .key { min-height: 42px; }
@@ -102,13 +104,13 @@
   <main class="shell">
     <div class="topline">
       <div class="brand"><img class="icon" src="/icons/tv-minimal-play.svg" alt="" />映匣遥控器</div>
-      <div class="connection" id="connection" data-state="ok">同一 Wi-Fi</div>
     </div>
     <div class="mode-picker" aria-label="控制窗口">
       <button type="button" data-mode-choice="browse" aria-pressed="true"><img class="icon" src="/icons/house.svg" alt="" />主界面</button>
       <button type="button" data-mode-choice="player" aria-pressed="false"><img class="icon" src="/icons/tv-minimal-play.svg" alt="" />播放窗口</button>
     </div>
     <section class="remote" aria-label="遥控器">
+      <div class="connection" id="connection" data-state="ok" aria-hidden="true"></div>
       <div class="touchpad" id="touchpad" aria-label="方向触控区">
         <button type="button" class="direction" data-command="up" aria-label="上"><img class="icon" src="/icons/chevron-up.svg" alt="" /></button>
         <button type="button" class="direction" data-command="right" aria-label="右"><img class="icon" src="/icons/chevron-right.svg" alt="" /></button>

@@ -16,6 +16,7 @@ PORT = 8765
 PAGE = (Path(__file__).parent / "index.html").read_bytes()
 ICONS = Path(__file__).parent / "icons"
 TARGET_BUNDLE_ID = "com.jo32.yingxia.mac"
+SHUTDOWN_COMMAND = "shutdown"
 KEY_CODES = {
     "up": 126,
     "down": 125,
@@ -99,6 +100,12 @@ class RemoteHandler(BaseHTTPRequestHandler):
             mode = request["mode"]
             if mode not in ("browse", "player"):
                 raise ValueError("invalid mode")
+            if command == SHUTDOWN_COMMAND:
+                if request.get("confirmation") != SHUTDOWN_COMMAND:
+                    self.send_text(400, "请先确认关闭 Mac")
+                    return
+                self.send_shutdown()
+                return
             if command in VOLUME_COMMANDS:
                 self.send_volume(VOLUME_COMMANDS[command])
                 return
@@ -209,6 +216,23 @@ class RemoteHandler(BaseHTTPRequestHandler):
         if left_fullscreen:
             message += "（已退出播放全屏）"
         self.send_text(200, message)
+
+    def send_shutdown(self):
+        try:
+            result = subprocess.run(
+                ["/usr/bin/osascript", "-e", 'tell application "System Events" to shut down'],
+                capture_output=True, text=True, timeout=12,
+            )
+        except subprocess.TimeoutExpired:
+            self.send_text(409, "关机请求未完成，请在 Mac 上检查保存或授权提示")
+            return
+        if result.returncode:
+            message = result.stderr.strip() or "无法关闭 Mac，请检查系统授权"
+            if "(-1743)" in message:
+                message = "请在系统设置 → 隐私与安全性 → 自动化中允许当前终端控制 System Events，然后重试"
+            self.send_text(409, message)
+            return
+        self.send_text(200, "已请求 Mac 关机；若有未保存文件，请在 Mac 上处理。")
 
     def send_volume(self, change):
         script = (

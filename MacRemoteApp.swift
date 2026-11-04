@@ -6,6 +6,7 @@ import Foundation
 
 private let port: UInt16 = 8765
 private let targetBundleID = "com.jo32.yingxia.mac"
+private let shutdownCommand = "shutdown"
 private let keyCodes = [
     "up": 126, "down": 125, "left": 123, "right": 124,
     "select": 36, "back": 53, "play": 49, "fullscreen": 3, "mute": 46,
@@ -218,6 +219,10 @@ private final class RemoteServer {
         guard let request = (try? JSONSerialization.jsonObject(with: body)) as? [String: String],
               let mode = request["mode"], ["browse", "player"].contains(mode),
               let command = request["command"] else { return Response(400, "指令格式错误") }
+        if command == shutdownCommand {
+            guard request["confirmation"] == shutdownCommand else { return Response(400, "请先确认关闭 Mac") }
+            return shutdown()
+        }
         if command == "volume_up" || command == "volume_down" { return volume(command == "volume_up" ? 5 : -5) }
         if command == "activate" { return activate(mode) }
         if mode == "browse" {
@@ -299,6 +304,16 @@ private final class RemoteServer {
         """
         let result = run(URL(fileURLWithPath: "/usr/bin/osascript"), ["-e", script])
         return result.status == 0 ? Response(200, "Mac 音量：\(result.output)%") : Response(409, result.error)
+    }
+
+    private func shutdown() -> Response {
+        let result = run(URL(fileURLWithPath: "/usr/bin/osascript"), ["-e", "tell application \"System Events\" to shut down"])
+        if result.status == 0 { return Response(200, "已请求 Mac 关机；若有未保存文件，请在 Mac 上处理。") }
+        if result.error.contains("(-1743)") {
+            return Response(409, "请在系统设置 → 隐私与安全性 → 自动化中允许映匣遥控器控制 System Events，然后重试")
+        }
+        if result.error == "操作超时" { return Response(409, "关机请求未完成，请在 Mac 上检查保存或授权提示") }
+        return Response(409, result.error.isEmpty ? "无法关闭 Mac，请检查系统授权" : result.error)
     }
 
     private func updateHighlight(_ target: Data?) {

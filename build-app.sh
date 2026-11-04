@@ -56,7 +56,7 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>$APP_VERSION</string>
   <key>CFBundleVersion</key><string>$APP_BUILD_NUMBER</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
-  <key>NSAppleEventsUsageDescription</key><string>向映匣发送播放快捷键，并调整 Mac 音量。</string>
+  <key>NSAppleEventsUsageDescription</key><string>向映匣发送播放快捷键、调整 Mac 音量，并在你确认后关闭 Mac。</string>
   <key>NSLocalNetworkUsageDescription</key><string>让同一 Wi-Fi 下的手机连接映匣遥控器。</string>
 </dict></plist>
 PLIST

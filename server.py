@@ -17,6 +17,8 @@ PAGE = (Path(__file__).parent / "index.html").read_bytes()
 ICONS = Path(__file__).parent / "icons"
 TARGET_BUNDLE_ID = "com.jo32.yingxia.mac"
 SHUTDOWN_COMMAND = "shutdown"
+KEY_SOUND = "/System/Library/Sounds/Tink.aiff"
+KEY_SOUND_VOLUME = "0.25"
 KEY_CODES = {
     "up": 126,
     "down": 125,
@@ -34,11 +36,18 @@ HIGHLIGHT = None
 selection = None
 menu_open = False
 selection_lock = threading.Lock()
+key_sound_process = None
+key_sound_lock = threading.Lock()
 
 
 class RemoteHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
+
+    def send_response(self, code, message=None):
+        super().send_response(code, message)
+        if self.command == "POST" and code == 200:
+            play_key_sound()
 
     def do_GET(self):
         url = urlsplit(self.path)
@@ -260,6 +269,20 @@ def run_key(key_code):
         'end tell'
     )
     return subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=5)
+
+
+def play_key_sound():
+    global key_sound_process
+    with key_sound_lock:
+        if key_sound_process is not None and key_sound_process.poll() is None:
+            key_sound_process.terminate()
+        try:
+            key_sound_process = subprocess.Popen(
+                ["/usr/bin/afplay", "-v", KEY_SOUND_VOLUME, KEY_SOUND],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except OSError:
+            key_sound_process = None
 
 
 def update_highlight(target):

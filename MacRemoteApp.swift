@@ -7,6 +7,7 @@ import Foundation
 private let port: UInt16 = 8765
 private let targetBundleID = "com.jo32.yingxia.mac"
 private let shutdownCommand = "shutdown"
+private let keySoundVolume: Float = 0.25
 private let keyCodes = [
     "up": 126, "down": 125, "left": 123, "right": 124,
     "select": 36, "back": 53, "play": 49, "fullscreen": 3, "mute": 46,
@@ -86,6 +87,7 @@ private final class RemoteServer {
     private let resources: URL
     private let helper: URL
     private let page: Data
+    private let keySound = NSSound(named: NSSound.Name("Tink"))
     private var socketFD: Int32 = -1
     private var highlight: Process?
     private var highlightInput: FileHandle?
@@ -182,10 +184,20 @@ private final class RemoteServer {
             let response = commandQueue.sync {
                 route(method: String(request[0]), path: String(request[1]), fields: fields, body: Data(body.prefix(length)))
             }
+            if request[0] == "POST" && response.status == 200 { playKeySound() }
             send(client, response)
             return
         }
         send(client, Response(413, "请求过长"))
+    }
+
+    private func playKeySound() {
+        DispatchQueue.main.async { [weak self] in
+            guard let sound = self?.keySound else { return }
+            _ = sound.stop()
+            sound.volume = keySoundVolume
+            _ = sound.play()
+        }
     }
 
     private func send(_ client: Int32, _ response: Response) {
